@@ -8,7 +8,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from Adapted_Block import Adapted_Block
+from segment_anything.modeling.adapter import Adapted_Block
 
 from typing import Optional, Tuple, Type
 
