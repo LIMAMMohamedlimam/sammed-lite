@@ -9,7 +9,7 @@ import torch
 from functools import partial
 
 from .modeling import ImageEncoderViT, MaskDecoder, PromptEncoder, Sam, TwoWayTransformer
-
+from .modeling.image_encoder import Adapted_Block 
 from torch.nn import functional as F
 
 def build_sam_vit_h(checkpoint=None):
@@ -58,7 +58,6 @@ def _build_sam(
     encoder_depth,
     encoder_num_heads,
     encoder_global_attn_indexes,
-    transformer_block,
     checkpoint=None,
 ):
     prompt_embed_dim = 256
@@ -79,7 +78,7 @@ def _build_sam(
             global_attn_indexes=encoder_global_attn_indexes,
             window_size=14,
             out_chans=prompt_embed_dim,
-            transformer_block=transformer_block
+            transformer_block=Adapted_Block
         ),
         prompt_encoder=PromptEncoder(
             embed_dim=prompt_embed_dim,
