@@ -1,12 +1,11 @@
 import json 
 import os 
-import random
 import numpy as np
 from skimage.measure import label, regionprops
 from albumentations.pytorch import ToTensorV2
 import cv2
 import torch
-from torch import Dataset
+from torch.utils.data import Dataset
 import albumentations as A
 
 def train_transforms(img_size, ori_h, ori_w):
