@@ -1,5 +1,5 @@
 from utils import evaluate_batch, combined_loss
-import tqdm
+from tqdm import tqdm
 import torch
 from pathlib import Path
 
