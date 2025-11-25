@@ -42,7 +42,7 @@ class SAMMed2DLite(nn.Module):
         boxes_flat = boxes.view(-1, 4)
 
         # Repeat Image Embeddings to match the number of boxes
-        image_embeddings_expanded = image_embeddings.unsqueeze(1).expand(-1, K, -1, -1, -1).reshape(B * K, 256, 64, 64)
+        image_embeddings_expanded = image_embeddings.unsqueeze(1).expand(-1, K, -1, -1, -1).reshape(B * K, C, H_e, W_e)
 
         # 3. Encode Prompts
         sparse_embeddings, dense_embeddings = self.sam.prompt_encoder(
