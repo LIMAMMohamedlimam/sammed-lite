@@ -8,6 +8,8 @@ import torch
 from torch.utils.data import Dataset
 import albumentations as A
 import random
+import matplotlib.pyplot as plt
+
 
 class DatasetLoader(Dataset):
     """image dataset"""
@@ -136,7 +138,6 @@ class DatasetLoader(Dataset):
 
     def __show_imag_mask__(self, idx):
         # Imports needed for visualization inside the method
-        import matplotlib.pyplot as plt
 
         img_path = self.image_paths[idx]
         image = cv2.imread(str(img_path))
