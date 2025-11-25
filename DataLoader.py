@@ -9,7 +9,6 @@ from torch.utils.data import Dataset
 import albumentations as A
 import random
 
-
 class DatasetLoader(Dataset):
     """image dataset"""
     def __init__(
@@ -79,12 +78,16 @@ class DatasetLoader(Dataset):
 
         h, w = image.shape[:2]
 
+        # --- FIX STARTS HERE ---
         # 1. Retrieve the labels for the current index
         current_labels = self.label_paths[idx]
 
-       
+        # 2. Safety check (though your __init__ likely handles this)
+        # Note: We use [current_labels] to make a list, not list(current_labels) 
+        # which would split a string path into individual characters.
         if isinstance(current_labels, str):
             current_labels = [current_labels]
+        # --- FIX ENDS HERE ---
             
         mask_paths = random.choices(current_labels, k=self.mask_num)
         
@@ -132,6 +135,8 @@ class DatasetLoader(Dataset):
         }
 
     def __show_imag_mask__(self, idx):
+        # Imports needed for visualization inside the method
+        import matplotlib.pyplot as plt
 
         img_path = self.image_paths[idx]
         image = cv2.imread(str(img_path))
@@ -139,7 +144,6 @@ class DatasetLoader(Dataset):
         if image is None:
             raise ValueError(f"Could not load image: {img_path}")
 
-        # Convert BGR to RGB for Matplotlib
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         h, w = image.shape[:2]
 
@@ -162,7 +166,6 @@ class DatasetLoader(Dataset):
             elif pre_mask.shape[:2] != (h, w):
                 pre_mask = cv2.resize(pre_mask, (w, h), interpolation=cv2.INTER_NEAREST)
 
-            # Normalize to 0-1 
             if pre_mask.max() > 1:
                 pre_mask = pre_mask / 255.0
 
@@ -171,18 +174,18 @@ class DatasetLoader(Dataset):
         
         total_plots = 1 + len(masks_list)
         
-        plt.figure(figsize=(4 * total_plots, 4)) # Adjust width based on number of masks
+        plt.figure(figsize=(4 * total_plots, 4)) 
 
-        #  Original Image
+        # The Original Image
         plt.subplot(1, total_plots, 1)
         plt.imshow(image)
         plt.title(f"Image {img_path}")
         plt.axis('off')
 
-        # The Masks
+        #  2...N: The Masks
         for i, mask in enumerate(masks_list):
             plt.subplot(1, total_plots, i + 2)
-            plt.imshow(mask, cmap='gray', vmin=0, vmax=1) # vmin/vmax ensures 0 is black, 1 is white
+            plt.imshow(mask, cmap='gray', vmin=0, vmax=1) 
             plt.title(f"Mask {i+1}")
             plt.axis('off')
 
