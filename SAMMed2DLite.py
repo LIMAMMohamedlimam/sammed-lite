@@ -52,6 +52,14 @@ class SAMMed2DLite(nn.Module):
         )
         
         # 4. Decode Masks
+        if dense_embeddings.shape[-2:] != (H_e, W_e):
+            dense_embeddings = F.interpolate(
+                dense_embeddings,
+                size=(H_e, W_e),
+                mode='bilinear',
+                align_corners=False
+            )
+        
         low_res_masks, iou_predictions = self.sam.mask_decoder(
             image_embeddings=image_embeddings_expanded,
             image_pe=self.sam.prompt_encoder.get_dense_pe(), 
