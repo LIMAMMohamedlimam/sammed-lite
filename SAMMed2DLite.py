@@ -59,6 +59,15 @@ class SAMMed2DLite(nn.Module):
                 mode='bilinear',
                 align_corners=False
             )
+
+        image_pe = self.sam.prompt_encoder.get_dense_pe()
+        if image_pe.shape[-2:] != (H_e, W_e):
+            image_pe = F.interpolate(
+                image_pe,
+                size=(H_e, W_e),
+                mode='bilinear',
+                align_corners=False
+            )
         
         low_res_masks, iou_predictions = self.sam.mask_decoder(
             image_embeddings=image_embeddings_expanded,
