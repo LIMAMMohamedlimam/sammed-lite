@@ -35,7 +35,8 @@ class SAMMed2DLite(nn.Module):
         image_embeddings = self.sam.image_encoder(images)
 
         # 2. Handle Dimensions
-        B, K, _ = boxes.shape
+        B, C, H_e, W_e = image_embeddings.shape
+        K = boxes.shape[1]
         
         # Flatten boxes from [B, K, 4] -> [B*K, 4]
         boxes_flat = boxes.view(-1, 4)
