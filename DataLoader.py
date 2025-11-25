@@ -133,6 +133,9 @@ class DatasetLoader(Dataset):
         h, w = image.shape[:2]
 
         current_labels = self.label_paths[idx]
+
+        if isinstance(current_labels,str):
+            current_labels = [current_labels]
         
         
         mask_paths = random.choices(current_labels, k=self.mask_num)
