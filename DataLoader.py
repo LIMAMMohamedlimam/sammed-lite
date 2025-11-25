@@ -126,47 +126,49 @@ class DatasetLoader(Dataset):
         image = cv2.imread(str(img_path))
         
         if image is None:
-            raise ValueError(f"Failed to load image at path: {img_path}")
+            raise ValueError(f"Could not load image: {img_path}")
 
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
+        current_labels = self.label_paths[idx]
+        
+        
+        mask_paths = random.choices(current_labels, k=self.mask_num)
+        
         masks_list = []
         boxes_list = []
         
-        current_labels = self.label_paths[idx]
-        k = min(len(current_labels), self.mask_num) 
-        mask_paths = random.choices(current_labels, k=k)
-
         image_tensor = None 
 
         for m in mask_paths:
             pre_mask = cv2.imread(m, 0)
+            
             if pre_mask is None:
-                continue
-                
-   
+                pre_mask = np.zeros((self.image_size, self.image_size), dtype=np.uint8)
+
             if pre_mask.max() == 255:
                 pre_mask = pre_mask / 255
             
+            # Apply transforms
             transformed = self.transform(image=image, mask=pre_mask)
-
+            
             image_tensor = transformed['image']
             mask_tensor = transformed['mask'].to(torch.int64)
-
-            # Pass the Tensor to helper, which now handles conversion
+            
+            # Get box
             box = self._get_bbox_from_mask(transformed['mask'])
 
             masks_list.append(mask_tensor)
             boxes_list.append(box)
 
-        if image_tensor is None:
-             raise ValueError(f"No valid masks found for image: {img_path}")
+        masks_tensor = torch.stack(masks_list).float().unsqueeze(1) 
+        boxes_tensor = torch.tensor(boxes_list, dtype=torch.float32)
 
         return {
-            'image': image_tensor, 
-            'masks': torch.stack(masks_list).float().unsqueeze(1), 
-            'bboxs': torch.tensor(boxes_list, dtype=torch.float32),
-            'original_size': (image.shape[0], image.shape[1]) 
+            'image': image_tensor,
+            'mask': masks_tensor,  
+            'bbox': boxes_tensor,  
+            'original_size': torch.tensor([image.shape[0], image.shape[1]])
         }
     
     @staticmethod
@@ -190,4 +192,3 @@ class DatasetLoader(Dataset):
 if __name__ == "__main__" :
     train_dataset = DatasetLoader("data_demo")
     print(train_dataset.__getitem__(0))
-    

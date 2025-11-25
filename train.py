@@ -12,9 +12,9 @@ def train_epoch(model, dataloader, optimizer, device, epoch):
     
     pbar = tqdm(dataloader, desc=f"Epoch {epoch}")
     for batch_idx, batch in enumerate(pbar):
-        images = batch['image'].to(device)
-        masks_gt = batch['mask'].to(device)
-        boxes = batch['bbox'].to(device)
+        images = batch['image'].to(device) # (B, 3, H, W)
+        masks_gt = batch['mask'].to(device) # (B, Mask_Num, 1, H, W)
+        boxes = batch['bbox'].to(device)    # (B, Mask_Num, 4)
         
         # Forward pass
         masks_pred, iou_pred = model(images, boxes)
