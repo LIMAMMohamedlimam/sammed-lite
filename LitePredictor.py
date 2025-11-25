@@ -1,11 +1,10 @@
-
-from typing import List, Optional
-import numpy as np
-from albumentations.pytorch import ToTensorV2
-import cv2
 import torch
+import cv2
+import numpy as np
 import albumentations as A
+from albumentations.pytorch import ToTensorV2
 import matplotlib.pyplot as plt
+from typing import List, Optional
 
 class LitePredictor:
     def __init__(self, model, device, image_size=256):
@@ -19,74 +18,123 @@ class LitePredictor:
                        std=[0.229, 0.224, 0.225]),
             ToTensorV2(),
         ])
-    
-    def predict(self, image_path: str, bbox: List[int], threshold=0.5):
+
+    def _resize_box(self, box, original_size):
         """
-        Predict segmentation mask
+        Rescale bbox coordinates from original size to model input size (256x256)
+        """
+        h, w = original_size
+        scale_x = self.image_size / w
+        scale_y = self.image_size / h
         
-        Args:
-            image_path: Path to input image
-            bbox: Bounding box [x1, y1, x2, y2]
-            threshold: Prediction threshold
-        """
+        x1, y1, x2, y2 = box
+        return [
+            int(x1 * scale_x),
+            int(y1 * scale_y),
+            int(x2 * scale_x),
+            int(y2 * scale_y)
+        ]
+
+    def predict(self, image_path: str, bbox: List[int], threshold=0.5):
         self.model.eval()
         
-        # Load and preprocess image
+        # 1. Load Image
         image = cv2.imread(image_path)
+        if image is None:
+            raise ValueError(f"Image not found at {image_path}")
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        original_size = image.shape[:2]
+        original_h, original_w = image.shape[:2]
         
+        # 2. Preprocess Image
         transformed = self.transform(image=image)
         image_tensor = transformed['image'].unsqueeze(0).to(self.device)
-        bbox_tensor = torch.tensor([bbox], dtype=torch.float32).to(self.device)
         
-        # Predict
+        # 3. Rescale BBox to match the resized image
+        resized_bbox = self._resize_box(bbox, (original_h, original_w))
+        bbox_tensor = torch.tensor([resized_bbox], dtype=torch.float32).to(self.device)
+        
+        # 4. Predict
         with torch.no_grad():
             mask_pred, iou_pred = self.model(image_tensor, bbox_tensor)
-            mask_pred = torch.sigmoid(mask_pred[0, 0])
+            
+            mask_prob = torch.sigmoid(mask_pred[0, 0])
         
-        # Post-process
-        mask = (mask_pred > threshold).cpu().numpy().astype(np.uint8)
-        mask = cv2.resize(mask, (original_size[1], original_size[0]), 
-                         interpolation=cv2.INTER_NEAREST)
+        # 5. Post-process (Resize mask back to original size)
+        mask_prob_np = mask_prob.cpu().numpy()
+        mask_full_size = cv2.resize(mask_prob_np, (original_w, original_h), 
+                                   interpolation=cv2.INTER_LINEAR)
         
-        return mask, iou_pred.item()
-    
+        final_mask = (mask_full_size > threshold).astype(np.uint8)
+        
+        return final_mask, iou_pred.item()
+
     def visualize_prediction(self, image_path: str, bbox: List[int], 
+                            gt_mask_path: Optional[str] = None, 
                             save_path: Optional[str] = None):
-        """Visualize prediction result"""
-        # Predict
-        mask, iou = self.predict(image_path, bbox)
+        """
+        Visualize: Input+Box | Ground Truth | Prediction | Overlay
+        """
+        # Run prediction
+        pred_mask, iou_score = self.predict(image_path, bbox)
         
-        # Load original image
+        # Load Original Image for display
         image = cv2.imread(image_path)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         
-        # Create visualization
-        fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+        # Setup Plot
+        cols = 4 if gt_mask_path else 3
+        fig, axes = plt.subplots(1, cols, figsize=(5 * cols, 5))
         
-        # Original image with bbox
+        # 1. Input Image + BBox
         axes[0].imshow(image)
         rect = plt.Rectangle((bbox[0], bbox[1]), bbox[2]-bbox[0], bbox[3]-bbox[1],
-                             fill=False, color='red', linewidth=2)
+                             fill=False, color='red', linewidth=3)
         axes[0].add_patch(rect)
-        axes[0].set_title('Input + BBox')
+        axes[0].set_title('Input Image + Prompt Box')
         axes[0].axis('off')
+
+        # 2. Ground Truth
+        plot_idx = 1
+        if gt_mask_path:
+            gt_mask = cv2.imread(gt_mask_path, 0)
+            if gt_mask is None:
+                gt_mask = np.zeros(image.shape[:2]) 
+            
+            if gt_mask.max() > 1:
+                gt_mask = gt_mask / 255.0
+
+            axes[plot_idx].imshow(gt_mask, cmap='gray')
+            axes[plot_idx].set_title('Ground Truth Mask')
+            axes[plot_idx].axis('off')
+            plot_idx += 1
+
+        # 3. Predicted Mask
+        axes[plot_idx].imshow(pred_mask, cmap='gray')
+        axes[plot_idx].set_title(f'Prediction (Pred IoU: {iou_score:.2f})')
+        axes[plot_idx].axis('off')
+        plot_idx += 1
         
-        # Predicted mask
-        axes[1].imshow(mask, cmap='gray')
-        axes[1].set_title(f'Predicted Mask (IoU: {iou:.3f})')
-        axes[1].axis('off')
-        
-        # Overlay
+        # 4. Overlay 
         overlay = image.copy()
-        overlay[mask > 0] = [255, 0, 0]
-        blended = cv2.addWeighted(image, 0.7, overlay, 0.3, 0)
-        axes[2].imshow(blended)
-        axes[2].set_title('Overlay')
-        axes[2].axis('off')
+        overlay[pred_mask == 1] = [0, 255, 0]
+        
+        blended = cv2.addWeighted(image, 0.6, overlay, 0.4, 0)
+        axes[plot_idx].imshow(blended)
+        axes[plot_idx].set_title('Overlay Result')
+        axes[plot_idx].axis('off')
         
         plt.tight_layout()
         if save_path:
-            plt.savefig(save_path, dpi=150, bbox_inches='tight')
+            plt.savefig(save_path, dpi=150)
+            print(f"Saved result to {save_path}")
         plt.show()
+
+def get_bbox_from_mask_file(mask_path):
+    mask = cv2.imread(mask_path, 0)
+    if mask is None: return [0, 0, 10, 10] # Dummy box if fail
+    rows = np.any(mask, axis=1)
+    cols = np.any(mask, axis=0)
+    if not rows.any() or not cols.any(): return [0,0,10,10]
+    rmin, rmax = np.where(rows)[0][[0, -1]]
+    cmin, cmax = np.where(cols)[0][[0, -1]]
+    return [cmin, rmin, cmax, rmax] # x1, y1, x2, y2

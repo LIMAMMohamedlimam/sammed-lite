@@ -30,13 +30,16 @@ def compute_iou(pred, target, threshold=0.5):
     
     iou = intersection / union
     return iou.item()
-
 def evaluate_batch(model, dataloader, device):
-    """Evaluate model on a dataset"""
+    """Evaluate model on a dataset with DEBUG printing"""
     model.eval()
     total_dice = 0.0
     total_iou = 0.0
     num_samples = 0
+    
+    # Track how many empty masks we see
+    empty_preds = 0
+    empty_targets = 0
     
     with torch.no_grad():
         for batch in tqdm(dataloader, desc="Evaluating"):
@@ -47,16 +50,34 @@ def evaluate_batch(model, dataloader, device):
             # Forward pass
             masks_pred, _ = model(images, boxes)
             
-            # Compute metrics
+            # DEBUG: Check logic range
+            sigmoid_pred = torch.sigmoid(masks_pred)
+            
             for i in range(images.shape[0]):
+                # Get binary prediction
+                pred_binary = (sigmoid_pred[i] > 0.5).float()
+                
+                # Check for emptiness
+                if pred_binary.sum() == 0:
+                    empty_preds += 1
+                if masks_gt[i].sum() == 0:
+                    empty_targets += 1
+
                 dice = compute_dice_coefficient(masks_pred[i], masks_gt[i])
                 iou = compute_iou(masks_pred[i], masks_gt[i])
+                
                 total_dice += dice
                 total_iou += iou
                 num_samples += 1
     
     avg_dice = total_dice / num_samples
     avg_iou = total_iou / num_samples
+    
+    print(f"\n--- DEBUG REPORT ---")
+    print(f"Total Samples: {num_samples}")
+    print(f"Empty Predictions (All Black): {empty_preds}")
+    print(f"Empty Ground Truths (All Black): {empty_targets}")
+    print(f"--------------------")
     
     return {'dice': avg_dice, 'iou': avg_iou}
 
