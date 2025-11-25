@@ -247,11 +247,31 @@ class ImageEncoderViT(nn.Module):
             ),
             LayerNorm2d(out_chans),
         )
+    
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.patch_embed(x)
+        
         if self.pos_embed is not None:
-            x = x + self.pos_embed
+            # Check if the shape of x matches the shape of pos_embed
+            # x  (B, H, W, C), pos_embed (1, H_pos, W_pos, C)
+            if x.shape[1] != self.pos_embed.shape[1] or x.shape[2] != self.pos_embed.shape[2]:
+                # Permute to (1, C, H, W) for interpolation
+                pos_embed = self.pos_embed.permute(0, 3, 1, 2)
+                
+                # Resize pos_embed to match x's spatial dimensions
+                pos_embed = F.interpolate(
+                    pos_embed, 
+                    size=(x.shape[1], x.shape[2]), 
+                    mode='bicubic', 
+                    align_corners=False
+                )
+                
+                # Permute back to (1, H, W, C)
+                pos_embed = pos_embed.permute(0, 2, 3, 1)
+                x = x + pos_embed
+            else:
+                x = x + self.pos_embed
 
         for blk in self.blocks:
             x = blk(x)
