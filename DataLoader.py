@@ -122,7 +122,10 @@ class DatasetLoader (Dataset):
     def __getitem__(self, idx):
         # Load image
         img_path = self.image_paths[idx]
+        print(f"image path: {img_path}")
         image = cv2.imread(str(img_path))
+        if image :
+            print(f"image with {idx}  loaded")
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         
         # Load mask
