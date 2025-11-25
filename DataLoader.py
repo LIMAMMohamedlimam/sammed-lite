@@ -7,6 +7,7 @@ import cv2
 import torch
 from torch.utils.data import Dataset
 import albumentations as A
+import random
 
 def train_transforms(img_size, ori_h, ori_w):
     transforms = []
@@ -72,14 +73,14 @@ def get_boxes_from_mask(mask, box_num=1, std = 0.1, max_pixel = 5):
     return torch.as_tensor(noise_boxes, dtype=torch.float)
 
 
-
-class DatasetLoader (Dataset):
+class DatasetLoader(Dataset):
     """image dataset"""
     def __init__(
         self, 
         data_dir:str,
         image_size: int = 256,
-        mode : int = 1 , # 0 for test , 1 for train
+        mode: int = 1, # 0 for test , 1 for train,
+        mask_num: int = 5
     ):
         data_type = {
             0 : 'test',
@@ -87,10 +88,11 @@ class DatasetLoader (Dataset):
         }
 
         self.image_size = image_size
+        self.mask_num = mask_num
         mode = data_type[mode]
         
         # Define transforms
-        if mode ==  'train':
+        if mode == 'train':
             dataset = json.load(open(os.path.join(data_dir, f'image2label_{mode}.json'), "r"))
 
             self.transform = A.Compose([
@@ -111,8 +113,8 @@ class DatasetLoader (Dataset):
                 ToTensorV2(),
             ])
         
-        self.image_paths = list(dataset.values())
-        self.label_paths = list(dataset.keys())
+        self.image_paths = list(dataset.keys())
+        self.label_paths = list(dataset.values())
 
         print(f"{mode}ing dataset loaded!")
     
@@ -120,36 +122,59 @@ class DatasetLoader (Dataset):
         return len(self.image_paths)
     
     def __getitem__(self, idx):
-        # Load image
         img_path = self.image_paths[idx]
-        print(f"image path: {img_path}")
         image = cv2.imread(str(img_path))
-        if image :
-            print(f"image with {idx}  loaded")
+        
+        if image is None:
+            raise ValueError(f"Failed to load image at path: {img_path}")
+
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+        masks_list = []
+        boxes_list = []
         
-        # Load mask
-        mask_path = self.label_paths 
-        mask = cv2.imread(str(mask_path), cv2.IMREAD_GRAYSCALE)
-        
-        # Apply transforms
-        transformed = self.transform(image=image, mask=mask)
-        image = transformed['image']
-        mask = transformed['mask']
-        
-        # Generate bounding box from mask
-        bbox = self._get_bbox_from_mask(mask.numpy())
-        
+        current_labels = self.label_paths[idx]
+        k = min(len(current_labels), self.mask_num) 
+        mask_paths = random.choices(current_labels, k=k)
+
+        image_tensor = None 
+
+        for m in mask_paths:
+            pre_mask = cv2.imread(m, 0)
+            if pre_mask is None:
+                continue
+                
+   
+            if pre_mask.max() == 255:
+                pre_mask = pre_mask / 255
+            
+            transformed = self.transform(image=image, mask=pre_mask)
+
+            image_tensor = transformed['image']
+            mask_tensor = transformed['mask'].to(torch.int64)
+
+            # Pass the Tensor to helper, which now handles conversion
+            box = self._get_bbox_from_mask(transformed['mask'])
+
+            masks_list.append(mask_tensor)
+            boxes_list.append(box)
+
+        if image_tensor is None:
+             raise ValueError(f"No valid masks found for image: {img_path}")
+
         return {
-            'image': image,
-            'mask': torch.from_numpy(mask).float().unsqueeze(0) / 255.0,
-            'bbox': torch.tensor(bbox, dtype=torch.float32),
-            'original_size': (image.shape[1], image.shape[2])
+            'image': image_tensor, 
+            'masks': torch.stack(masks_list).float().unsqueeze(1), 
+            'bboxs': torch.tensor(boxes_list, dtype=torch.float32),
+            'original_size': (image.shape[0], image.shape[1]) 
         }
     
     @staticmethod
     def _get_bbox_from_mask(mask):
         """Extract bounding box from mask"""
+        if isinstance(mask, torch.Tensor):
+            mask = mask.detach().cpu().numpy()
+            
         rows = np.any(mask, axis=1)
         cols = np.any(mask, axis=0)
         
@@ -160,3 +185,9 @@ class DatasetLoader (Dataset):
         cmin, cmax = np.where(cols)[0][[0, -1]]
         
         return [cmin, rmin, cmax, rmax]  # x1, y1, x2, y2
+    
+
+if __name__ == "__main__" :
+    train_dataset = DatasetLoader("data_demo")
+    print(train_dataset.__getitem__(0))
+    
