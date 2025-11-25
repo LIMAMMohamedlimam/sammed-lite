@@ -132,12 +132,10 @@ class DatasetLoader(Dataset):
 
         h, w = image.shape[:2]
 
-        current_labels = self.label_paths[idx]
-
-        if isinstance(current_labels,str):
+    
+        if isinstance(current_labels, str):
             current_labels = [current_labels]
-        
-        
+            
         mask_paths = random.choices(current_labels, k=self.mask_num)
         
         masks_list = []
@@ -148,13 +146,17 @@ class DatasetLoader(Dataset):
         for m in mask_paths:
             pre_mask = cv2.imread(m, 0)
             
+          
             if pre_mask is None:
+                # Create blank mask if file not found
                 pre_mask = np.zeros((h, w), dtype=np.uint8)
-            elif pre_mask.shape[:2] != (h,w) :
+            elif pre_mask.shape[:2] != (h, w):
+                # Resize if dimensions don't match image
                 pre_mask = cv2.resize(pre_mask, (w, h), interpolation=cv2.INTER_NEAREST)
 
-            if pre_mask.max() == 255:
-                pre_mask = pre_mask / 255
+ 
+            if pre_mask.max() > 1:
+                pre_mask = pre_mask / 255.0
             
             # Apply transforms
             transformed = self.transform(image=image, mask=pre_mask)
