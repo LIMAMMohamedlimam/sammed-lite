@@ -48,6 +48,7 @@ def evaluate_batch(model, dataloader, device):
             boxes = batch['bbox'].to(device)
             
             # Forward pass
+            masks_gt = (masks_gt > 0.5).float()
             masks_pred, _ = model(images, boxes)
             
             # DEBUG: Check logic range
