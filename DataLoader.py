@@ -130,6 +130,8 @@ class DatasetLoader(Dataset):
 
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
+        h, w = image.shape[:2]
+
         current_labels = self.label_paths[idx]
         
         
@@ -144,7 +146,9 @@ class DatasetLoader(Dataset):
             pre_mask = cv2.imread(m, 0)
             
             if pre_mask is None:
-                pre_mask = np.zeros((self.image_size, self.image_size), dtype=np.uint8)
+                pre_mask = np.zeros((h, w), dtype=np.uint8)
+            elif pre_mask.shape[:2] != (h,w) :
+                pre_mask = cv2.resize(pre_mask, (w, h), interpolation=cv2.INTER_NEAREST)
 
             if pre_mask.max() == 255:
                 pre_mask = pre_mask / 255
@@ -170,7 +174,7 @@ class DatasetLoader(Dataset):
             'image': image_tensor,
             'mask': masks_tensor,  
             'bbox': boxes_tensor,  
-            'original_size': torch.tensor([image.shape[0], image.shape[1]])
+            'original_size': torch.tensor([h, w])
         }
     
     @staticmethod
