@@ -71,7 +71,7 @@ class SAMMed2DLite(nn.Module):
         
         low_res_masks, iou_predictions = self.sam.mask_decoder(
             image_embeddings=image_embeddings_expanded,
-            image_pe=self.sam.prompt_encoder.get_dense_pe(), 
+            image_pe=image_pe, 
             sparse_prompt_embeddings=sparse_embeddings,
             dense_prompt_embeddings=dense_embeddings,
             multimask_output=False,
