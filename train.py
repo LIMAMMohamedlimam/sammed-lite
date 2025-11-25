@@ -20,7 +20,9 @@ def train_epoch(model, dataloader, optimizer, device, epoch):
         masks_pred, iou_pred = model(images, boxes)
         
         # Compute loss
-        loss = combined_loss(masks_pred, masks_gt)
+        masks_pred_flat = masks_pred.flatten(0, 1)
+        masks_gt_flat = masks_gt.flatten(0, 1)
+        loss = combined_loss(masks_pred_flat, masks_gt_flat)
         
         # Backward pass
         optimizer.zero_grad()

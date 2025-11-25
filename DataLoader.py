@@ -163,6 +163,8 @@ class DatasetLoader(Dataset):
 
         masks_tensor = torch.stack(masks_list).float().unsqueeze(1) 
         boxes_tensor = torch.tensor(boxes_list, dtype=torch.float32)
+        if boxes_tensor.ndim == 1:
+            boxes_tensor = boxes_tensor.unsqueeze(0)
 
         return {
             'image': image_tensor,
