@@ -133,7 +133,9 @@ class DatasetLoader(Dataset):
             'image': image_tensor,
             'mask': masks_tensor,  
             'bbox': boxes_tensor,  
-            'original_size': torch.tensor([h, w])
+            'original_size': torch.tensor([h, w]),
+            'image_path' : img_path,
+            'masks_paths' : mask_paths
         }
 
     def __show_imag_mask__(self, idx):
