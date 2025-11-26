@@ -2,8 +2,7 @@ from utils import evaluate_batch, combined_loss
 from tqdm import tqdm
 import torch
 from pathlib import Path
-
-
+import os
 
 def train_epoch(model, dataloader, optimizer, device, epoch):
     """Train for one epoch"""
@@ -12,9 +11,9 @@ def train_epoch(model, dataloader, optimizer, device, epoch):
     
     pbar = tqdm(dataloader, desc=f"Epoch {epoch}")
     for batch_idx, batch in enumerate(pbar):
-        images = batch['image'].to(device) # (B, 3, H, W)
-        masks_gt = batch['mask'].to(device) # (B, Mask_Num, 1, H, W)
-        boxes = batch['bbox'].to(device)    # (B, Mask_Num, 4)
+        images = batch['image'].to(device)       # (B, 3, H, W)
+        masks_gt = batch['mask'].to(device)      # (B, Mask_Num, 1, H, W)
+        boxes = batch['bbox'].to(device)         # (B, Mask_Num, 4)
         
         # Forward pass
         masks_pred, iou_pred = model(images, boxes)
@@ -44,9 +43,12 @@ def train_model(
     num_epochs=50,
     learning_rate=1e-4,
     save_dir='checkpoints',
+    checkpoint_frequency=10 # New parameter to control save freq
 ):
-    """Complete training pipeline"""
-    Path(save_dir).mkdir(exist_ok=True)
+    """
+    Complete training pipeline using custom Lite saving methods.
+    """
+    Path(save_dir).mkdir(exist_ok=True, parents=True)
     
     # Optimizer (only trainable parameters)
     optimizer = torch.optim.AdamW(
@@ -63,44 +65,46 @@ def train_model(
     best_dice = 0.0
     history = {'train_loss': [], 'val_dice': [], 'val_iou': []}
     
+    print(f"Starting training for {num_epochs} epochs...")
+    print(f"Checkpoints will be saved to: {save_dir}")
+    
     for epoch in range(1, num_epochs + 1):
-        # Train
+        # 1. Train
         train_loss = train_epoch(model, train_loader, optimizer, device, epoch)
         history['train_loss'].append(train_loss)
         
-        # Validate
+        # 2. Validate
         val_metrics = evaluate_batch(model, val_loader, device)
         history['val_dice'].append(val_metrics['dice'])
         history['val_iou'].append(val_metrics['iou'])
         
-        # Learning rate step
+        # 3. Learning rate step
         scheduler.step()
         
         # Print epoch summary
-        print(f"\nEpoch {epoch}/{num_epochs}")
-        print(f"Train Loss: {train_loss:.4f}")
-        print(f"Val Dice: {val_metrics['dice']:.4f}")
-        print(f"Val IoU: {val_metrics['iou']:.4f}")
+        print(f"Epoch {epoch}/{num_epochs} | Loss: {train_loss:.4f} | Val Dice: {val_metrics['dice']:.4f} | Val IoU: {val_metrics['iou']:.4f}")
         
-        # Save best model
+        # 4. Save BEST Model 
         if val_metrics['dice'] > best_dice:
             best_dice = val_metrics['dice']
-            torch.save({
-                'epoch': epoch,
-                'model_state_dict': model.state_dict(),
-                'optimizer_state_dict': optimizer.state_dict(),
-                'dice': best_dice,
-                'iou' : val_metrics["iou"]
-            }, f"{save_dir}/best_model.pth")
-            print(f"Saved best model with Dice: {best_dice:.4f}")
+            
+            save_path = os.path.join(save_dir, "best_lite_model.pth")
+            model.save_lite_weights(save_path)
+            
+            print(f"New Best Model (Dice: {best_dice:.4f}) saved to {save_path}")
         
-        if epoch%10 == 0 :
-            torch.save({
-                'epoch': epoch,
-                'model_state_dict': model.state_dict(),
-                'optimizer_state_dict': optimizer.state_dict(),
-                'dice': val_metrics['dice'],
-                'iou' : val_metrics["iou"]
-            }, f"{save_dir}/best_model.pth")
+        # 5. Periodic Checkpoint 
+        if epoch % checkpoint_frequency == 0 or epoch == num_epochs:
+            ckpt_path = os.path.join(save_dir, f"checkpoint_epoch_{epoch}.pth")
+            
+            model.save_checkpoint(
+                path=ckpt_path,
+                optimizer=optimizer,
+                epoch=epoch,
+                loss=train_loss,
+                scheduler=scheduler
+            )
+            print(f"Checkpoint saved to {ckpt_path}")
     
+    print("Training Complete.")
     return history

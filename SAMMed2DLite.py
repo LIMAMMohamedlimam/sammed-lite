@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 from segment_anything.modeling import Sam
 import torch.nn.functional as F
@@ -92,3 +93,79 @@ class SAMMed2DLite(nn.Module):
         iou_predictions = iou_predictions.view(B, K, 1)
         
         return masks, iou_predictions
+    
+
+
+
+
+
+# Saving and loading methods ( training on limited resources )
+
+
+    def save_lite_weights(self, path):
+        """
+        Saves ONLY the trainable parameters (adapters, mask_decoder, prompt_encoder).
+        """
+        # Filter state_dict to only include keys that required gradients
+        trainable_keys = {
+            k: v for k, v in self.state_dict().items() 
+            if k in [n for n, p in self.named_parameters() if p.requires_grad]
+        }
+        torch.save(trainable_keys, path)
+        print(f"Lite weights saved to {path} ({len(trainable_keys)} keys)")
+
+    def load_lite_weights(self, path, device='cpu'):
+        """
+        Loads the lite weights into the model. 
+        """
+        state_dict = torch.load(path, map_location=device)
+        missing_keys, unexpected_keys = self.load_state_dict(state_dict, strict=False)
+        
+        if len(unexpected_keys) > 0:
+            print(f"Warning: Unexpected keys found: {unexpected_keys}")
+        print(f"Lite weights loaded successfully.")
+
+    def save_checkpoint(self, path, optimizer, epoch, loss, scheduler=None):
+        """
+        Saves a training checkpoint containing the Lite model weights + Optimizer state.
+        """
+        trainable_model_state = {
+            k: v for k, v in self.state_dict().items() 
+            if k in [n for n, p in self.named_parameters() if p.requires_grad]
+        }
+
+        checkpoint = {
+            'epoch': epoch,
+            'model_state_dict': trainable_model_state,
+            'optimizer_state_dict': optimizer.state_dict(),
+            'loss': loss,
+        }
+        
+        if scheduler:
+            checkpoint['scheduler_state_dict'] = scheduler.state_dict()
+
+        torch.save(checkpoint, path)
+        print(f"Checkpoint saved: Epoch {epoch} at {path}")
+
+    def load_checkpoint(self, path, optimizer, scheduler=None, device='cpu'):
+        """
+        Loads a checkpoint to resume training.
+        Returns: epoch, loss
+        """
+        checkpoint = torch.load(path, map_location=device)
+        
+        # 1. Load Model
+        self.load_state_dict(checkpoint['model_state_dict'], strict=False)
+        
+        # 2. Load Optimizer
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        
+        # 3. Load Scheduler 
+        if scheduler and 'scheduler_state_dict' in checkpoint:
+            scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
+            
+        epoch = checkpoint['epoch']
+        loss = checkpoint['loss']
+        
+        print(f"Resumed training from Epoch {epoch}")
+        return epoch, loss
