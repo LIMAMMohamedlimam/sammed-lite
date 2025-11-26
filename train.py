@@ -1,3 +1,4 @@
+from datetime import datetime
 from utils import evaluate_batch, combined_loss
 from tqdm import tqdm
 import torch
@@ -43,7 +44,7 @@ def train_model(
     num_epochs=50,
     learning_rate=1e-4,
     save_dir='checkpoints',
-    checkpoint_frequency=10 # New parameter to control save freq
+    checkpoint_frequency= 5
 ):
     """
     Complete training pipeline using custom Lite saving methods.
@@ -95,7 +96,9 @@ def train_model(
         
         # 5. Periodic Checkpoint 
         if epoch % checkpoint_frequency == 0 or epoch == num_epochs:
-            ckpt_path = os.path.join(save_dir, f"checkpoint_epoch_{epoch}.pth")
+            timestamp = datetime.now().strftime("%Y_%m_%d_%H:%M:%S")
+            ckpt_filename = f"checkpoint_{timestamp}_epoch_{epoch}.pth"
+            ckpt_path = os.path.join(save_dir, ckpt_filename)
             
             model.save_checkpoint(
                 path=ckpt_path,

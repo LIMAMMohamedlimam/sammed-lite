@@ -24,7 +24,7 @@ class DatasetLoader(Dataset):
             0 : 'test',
             1 : 'train'
         }
-
+        
         self.image_size = image_size
         self.mask_num = mask_num
         mode = data_type[mode]

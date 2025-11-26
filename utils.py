@@ -1,6 +1,7 @@
 import torch
 from tqdm import tqdm
 import torch.nn.functional as F
+from DataLoader import DatasetLoader
 
 
 
@@ -30,7 +31,7 @@ def compute_iou(pred, target, threshold=0.5):
     
     iou = intersection / union
     return iou.item()
-def evaluate_batch(model, dataloader, device):
+def evaluate_batch(model, dataloader : DatasetLoader, device):
     """Evaluate model on a dataset with DEBUG printing"""
     model.eval()
     total_dice = 0.0
@@ -80,7 +81,7 @@ def evaluate_batch(model, dataloader, device):
     print(f"Empty Ground Truths (All Black): {empty_targets}")
     print(f"--------------------")
     
-    return {'dice': avg_dice, 'iou': avg_iou}
+    return {'dice': avg_dice, 'iou': avg_iou , "test_dataset":dataloader.image_paths}
 
 
 
