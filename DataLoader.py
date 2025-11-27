@@ -34,6 +34,7 @@ class DatasetLoader(Dataset):
             dataset = json.load(open(os.path.join(data_dir, f'image2label_{mode}.json'), "r"))
 
             self.transform = A.Compose([
+                A.ToGray(p=1),
                 A.Resize(image_size, image_size),
                 A.HorizontalFlip(p=0.5),
                 A.RandomBrightnessContrast(p=0.3),

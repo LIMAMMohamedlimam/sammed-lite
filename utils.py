@@ -31,6 +31,9 @@ def compute_iou(pred, target, threshold=0.5):
     
     iou = intersection / union
     return iou.item()
+
+
+
 def evaluate_batch(model, dataloader : DatasetLoader, device):
     """Evaluate model on a dataset with DEBUG printing"""
     model.eval()
