@@ -84,7 +84,7 @@ def evaluate_batch(model, dataloader : DatasetLoader, device):
     print(f"Empty Ground Truths (All Black): {empty_targets}")
     print(f"--------------------")
     
-    return {'dice': avg_dice, 'iou': avg_iou , "test_dataset":dataloader.image_paths}
+    return {'dice': avg_dice, 'iou': avg_iou }
 
 
 
