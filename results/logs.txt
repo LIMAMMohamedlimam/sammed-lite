@@ -25,3 +25,18 @@ Dice Coefficient: 0.9303
 IoU: 0.8717
 
 --------------------------------------------------------------------------------------------------------------
+result of a sample training on kits23 dataset 
+
+Evaluating: 100%|██████████| 352/352 [01:13<00:00,  4.79it/s]
+--- DEBUG REPORT ---
+Total Samples: 1408
+Empty Predictions (All Black): 1279
+Empty Ground Truths (All Black): 837
+--------------------
+
+=== Test Results ===
+Dice Coefficient: 0.6224
+IoU: 0.6149
+
+
+------------------------------------------------------------------------------------------------------------

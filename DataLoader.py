@@ -32,7 +32,7 @@ class DatasetLoader(Dataset):
         # Define transforms
         if mode == 'train':
             dataset = json.load(open(os.path.join(data_dir, f'image2label_{mode}.json'), "r"))
-
+            ## TODO : revoir la stratégie de normalisation
             self.transform = A.Compose([
                 A.ToGray(p=1),
                 A.Resize(image_size, image_size),
