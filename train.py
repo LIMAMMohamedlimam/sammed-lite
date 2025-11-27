@@ -51,7 +51,7 @@ def train_model(
     """
     Path(save_dir).mkdir(exist_ok=True, parents=True)
     
-    # Optimizer (only trainable parameters)
+    # Optimizer 
     optimizer = torch.optim.AdamW(
         filter(lambda p: p.requires_grad, model.parameters()),
         lr=learning_rate,

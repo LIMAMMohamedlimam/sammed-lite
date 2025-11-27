@@ -78,7 +78,7 @@ class SAMMed2DLite(nn.Module):
             multimask_output=False,
         )
         
-        print(f"DEBUG: Mask Logits | Min: {low_res_masks.min().detach().item():.4f} | Max: {low_res_masks.max().detach().item():.4f}")
+        # print(f"DEBUG: Mask Logits | Min: {low_res_masks.min().detach().item():.4f} | Max: {low_res_masks.max().detach().item():.4f}")
 
         # 5. Upscale Masks
         masks = F.interpolate(
