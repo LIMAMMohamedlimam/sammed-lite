@@ -18,7 +18,8 @@ class DatasetLoader(Dataset):
         data_dir:str,
         image_size: int = 256,
         mode: int = 1, # 0 for test , 1 for train,
-        mask_num: int = 5
+        mask_num: int = 5,
+        dataset_name:str=None
     ):
         data_type = {
             0 : 'test',
@@ -31,10 +32,15 @@ class DatasetLoader(Dataset):
 
         self.pixel_mean = [123.675, 116.28, 103.53]
         self.pixel_std = [58.395, 57.12, 57.375]
+        
+        if dataset_name != None :
+            dataset_name +="_"
+        else:
+            dataset_name="" 
 
         # Define transforms
         if mode == 'train':
-            dataset = json.load(open(os.path.join(data_dir, f'image2label_{mode}.json'), "r"))
+            dataset = json.load(open(os.path.join(data_dir, f'{dataset_name}image2label_{mode}.json'), "r"))
             ## TODO : revoir la stratégie de normalisation
             self.transform = A.Compose([
                 A.ToGray(p=1),
@@ -48,7 +54,7 @@ class DatasetLoader(Dataset):
             self.image_paths = list(dataset.keys())
             raw_labels = list(dataset.values())
         else:
-            dataset = json.load(open(os.path.join(data_dir, f'label2image_{mode}.json'), "r"))
+            dataset = json.load(open(os.path.join(data_dir, f'{dataset_name}label2image_{mode}.json'), "r"))
 
             self.transform = A.Compose([
                 A.Resize(image_size, image_size),
