@@ -162,6 +162,8 @@ class DatasetLoader(Dataset):
             mask_paths = random.choices(current_labels, k=self.mask_num)
         else:
             mask_paths = []
+
+        print(f"DEBUG : mask_paths_len: {len(mask_paths) }mask_paths: {mask_paths}")
         
         masks_list = []
 
