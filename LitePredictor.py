@@ -6,6 +6,8 @@ from albumentations.pytorch import ToTensorV2
 import matplotlib.pyplot as plt
 from typing import List, Optional
 
+from utils import dice_loss, iou_mse_loss
+
 class LitePredictor:
     def __init__(self, model, device, image_size=256):
         self.model = model
@@ -121,9 +123,12 @@ class LitePredictor:
             axes[plot_idx].axis('off')
             plot_idx += 1
 
+        dice_score = dice_loss(pred_mask , gt_mask)
+        iou_mse_score = iou_mse_loss(pred_mask , gt_mask,iou_score)
+
         # 3. Predicted Mask
         axes[plot_idx].imshow(pred_mask, cmap='gray')
-        axes[plot_idx].set_title(f'Prediction (Pred IoU: {iou_score:.2f})')
+        axes[plot_idx].set_title(f'Prediction (Pred IoU: {iou_score:.2f} | Dice: {dice_score:.2f} | IoU_MSE: {iou_mse_score:.2f})')
         axes[plot_idx].axis('off')
         plot_idx += 1
 

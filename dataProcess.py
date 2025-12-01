@@ -248,5 +248,5 @@ def down_lung_xrays_dataset() :
 
     print("-" * 30)
     print(f"Total valid images found: {len(matched_samples)}")
-    print(f"Training images: {len(train_map)} saved to 'lung_image2label_train.json'")
-    print(f"Testing masks: {len(test_map)} saved to 'lung_label2image_test.json'")
+    print(f"Training images: {len(train_map)} saved to 'lung_xray_image2label_train.json'")
+    print(f"Testing masks: {len(test_map)} saved to 'lung_xray_label2image_test.json'")
