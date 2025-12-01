@@ -29,6 +29,9 @@ class DatasetLoader(Dataset):
         self.mask_num = mask_num
         mode = data_type[mode]
 
+        self.pixel_mean = [123.675, 116.28, 103.53]
+        self.pixel_std = [58.395, 57.12, 57.375]
+
         # Define transforms
         if mode == 'train':
             dataset = json.load(open(os.path.join(data_dir, f'image2label_{mode}.json'), "r"))
@@ -38,8 +41,8 @@ class DatasetLoader(Dataset):
                 A.Resize(image_size, image_size),
                 A.HorizontalFlip(p=0.5),
                 A.RandomBrightnessContrast(p=0.3),
-                A.Normalize(mean=[0.485, 0.456, 0.406],
-                           std=[0.229, 0.224, 0.225]),
+                A.Normalize(mean=self.pixel_mean,
+                           std=self.pixel_std),
                 ToTensorV2(),
             ])
             self.image_paths = list(dataset.keys())
@@ -49,8 +52,8 @@ class DatasetLoader(Dataset):
 
             self.transform = A.Compose([
                 A.Resize(image_size, image_size),
-                A.Normalize(mean=[0.485, 0.456, 0.406],
-                           std=[0.229, 0.224, 0.225]),
+                A.Normalize(mean=self.pixel_mean,
+                           std=self.pixel_std),
                 ToTensorV2(),
             ])
             self.image_paths = list(dataset.values())
