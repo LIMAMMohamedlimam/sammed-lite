@@ -3,6 +3,9 @@ import kagglehub
 import os
 import json
 import random
+import numpy as np
+import cv2
+from tqdm import tqdm
 
 
 def down_finding_lungs_ct_data () :
