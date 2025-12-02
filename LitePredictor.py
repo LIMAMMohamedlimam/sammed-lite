@@ -83,16 +83,87 @@ class LitePredictor:
 
         return final_mask, iou_pred[0, 0].item()
 
+    # def visualize_prediction(self, image_path: str, bbox: List[int],
+    #                         gt_mask_path: Optional[str] = None,
+    #                         save_path: Optional[str] = None):
+    #     """
+    #     Visualize: Input+Box | Ground Truth | Prediction | Overlay
+    #     """
+    #     # Run prediction
+    #     pred_mask, iou_score = self.predict(image_path, bbox)
+
+    #     # Load Original Image for display
+    #     image = cv2.imread(image_path)
+    #     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+    #     # Setup Plot
+    #     cols = 4 if gt_mask_path else 3
+    #     fig, axes = plt.subplots(1, cols, figsize=(5 * cols, 5))
+
+    #     # 1. Input Image + BBox
+    #     axes[0].imshow(image)
+    #     rect = plt.Rectangle((bbox[0], bbox[1]), bbox[2]-bbox[0], bbox[3]-bbox[1],
+    #                          fill=False, color='red', linewidth=3)
+    #     axes[0].add_patch(rect)
+    #     axes[0].set_title('Input Image + Prompt Box')
+    #     axes[0].axis('off')
+
+    #     # 2. Ground Truth
+    #     plot_idx = 1
+    #     if gt_mask_path:
+    #         gt_mask = cv2.imread(gt_mask_path, 0)
+    #         if gt_mask is None:
+    #             gt_mask = np.zeros(image.shape[:2])
+
+    #         if gt_mask.max() > 1:
+    #             gt_mask = gt_mask / 255.0
+
+    #         axes[plot_idx].imshow(gt_mask, cmap='gray')
+    #         axes[plot_idx].set_title('Ground Truth Mask')
+    #         axes[plot_idx].axis('off')
+    #         plot_idx += 1
+
+    #     try:
+    #         pred_mask_tensor = torch.tensor(pred_mask).unsqueeze(0).unsqueeze(0).float()
+    #         gt_mask_tensor = torch.tensor(gt_mask).unsqueeze(0).unsqueeze(0).float()
+    #         dice_score = dice_loss(pred_mask_tensor , gt_mask_tensor)
+    #         iou_mse_score = iou_mse_loss(pred_mask_tensor ,gt_mask_tensor,iou_score)
+    #     except:
+    #         print("Could not compute Dice/IoU_MSE scores for visualization.")
+    #         dice_score = 0.0
+    #         iou_mse_score = 0.0
+
+    #     # 3. Predicted Mask
+    #     axes[plot_idx].imshow(pred_mask, cmap='gray')
+    #     axes[plot_idx].set_title(f'Prediction (Pred IoU: {iou_score:.2f} | Dice: {dice_score:.2f} | IoU_MSE: {iou_mse_score:.2f})')
+    #     axes[plot_idx].axis('off')
+    #     plot_idx += 1
+
+    #     # 4. Overlay
+    #     overlay = image.copy()
+    #     overlay[pred_mask == 1] = [0, 255, 0]
+
+    #     blended = cv2.addWeighted(image, 0.6, overlay, 0.4, 0)
+    #     axes[plot_idx].imshow(blended)
+    #     axes[plot_idx].set_title('Overlay Result')
+    #     axes[plot_idx].axis('off')
+
+    #     plt.tight_layout()
+    #     if save_path:
+    #         plt.savefig(save_path, dpi=150)
+    #         print(f"Saved result to {save_path}")
+    #     plt.show()
+
     def visualize_prediction(self, image_path: str, bbox: List[int],
-                            gt_mask_path: Optional[str] = None,
-                            save_path: Optional[str] = None):
+                        gt_mask_path: Optional[str] = None,
+                        save_path: Optional[str] = None):
         """
         Visualize: Input+Box | Ground Truth | Prediction | Overlay
         """
-        # Run prediction
-        pred_mask, iou_score = self.predict(image_path, bbox)
+        # 1. Run prediction (Unpack 3 values now)
+        pred_mask, pred_prob, pred_iou_value = self.predict(image_path, bbox)
 
-        # Load Original Image for display
+        # Load Original Image
         image = cv2.imread(image_path)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
@@ -100,58 +171,76 @@ class LitePredictor:
         cols = 4 if gt_mask_path else 3
         fig, axes = plt.subplots(1, cols, figsize=(5 * cols, 5))
 
-        # 1. Input Image + BBox
+        # --- Plot 1: Input Image + BBox ---
         axes[0].imshow(image)
         rect = plt.Rectangle((bbox[0], bbox[1]), bbox[2]-bbox[0], bbox[3]-bbox[1],
-                             fill=False, color='red', linewidth=3)
+                                fill=False, color='red', linewidth=3)
         axes[0].add_patch(rect)
-        axes[0].set_title('Input Image + Prompt Box')
+        axes[0].set_title(f'Input + Box\nPred IoU: {pred_iou_value:.3f}')
         axes[0].axis('off')
 
-        # 2. Ground Truth
+        # Variables for title
+        dice_score = 0.0
+        iou_mse_score = 0.0
+        
+        # --- Plot 2: Ground Truth (If available) ---
         plot_idx = 1
         if gt_mask_path:
             gt_mask = cv2.imread(gt_mask_path, 0)
             if gt_mask is None:
-                gt_mask = np.zeros(image.shape[:2])
+                gt_mask = np.zeros(image.shape[:2], dtype=np.uint8)
+            
+            # Binarize GT
+            gt_mask = (gt_mask > 127).astype(np.uint8)
 
-            if gt_mask.max() > 1:
-                gt_mask = gt_mask / 255.0
+            # --- CALCULATE METRICS HERE ---
+            # 1. Dice Score
+            intersection = np.logical_and(pred_mask, gt_mask).sum()
+            union_dice = pred_mask.sum() + gt_mask.sum()
+            if union_dice > 0:
+                dice_score = (2. * intersection) / union_dice
+            else:
+                dice_score = 1.0 if (pred_mask.sum() == 0 and gt_mask.sum() == 0) else 0.0
+
+            # 2. Actual IoU (to calculate MSE)
+            union_iou = np.logical_or(pred_mask, gt_mask).sum()
+            actual_iou = intersection / (union_iou + 1e-6)
+
+            # 3. IoU MSE (Predicted vs Actual)
+            iou_mse_score = (pred_iou_value - actual_iou) ** 2
 
             axes[plot_idx].imshow(gt_mask, cmap='gray')
             axes[plot_idx].set_title('Ground Truth Mask')
             axes[plot_idx].axis('off')
             plot_idx += 1
 
-        try:
-            pred_mask_tensor = torch.tensor(pred_mask).unsqueeze(0).unsqueeze(0).float()
-            gt_mask_tensor = torch.tensor(gt_mask).unsqueeze(0).unsqueeze(0).float()
-            dice_score = dice_loss(pred_mask_tensor , gt_mask_tensor)
-            iou_mse_score = iou_mse_loss(pred_mask_tensor ,gt_mask_tensor,iou_score)
-        except:
-            dice_score = 0.0
-            iou_mse_score = 0.0
-
-        # 3. Predicted Mask
+        # --- Plot 3: Prediction ---
         axes[plot_idx].imshow(pred_mask, cmap='gray')
-        axes[plot_idx].set_title(f'Prediction (Pred IoU: {iou_score:.2f} | Dice: {dice_score:.2f} | IoU_MSE: {iou_mse_score:.2f})')
+        if gt_mask_path:
+            # Show calculated scores in title
+            axes[plot_idx].set_title(f'Prediction\nDice: {dice_score:.3f} | IoU MSE: {iou_mse_score:.4f}')
+        else:
+            axes[plot_idx].set_title(f'Prediction')
         axes[plot_idx].axis('off')
         plot_idx += 1
 
-        # 4. Overlay
-        overlay = image.copy()
-        overlay[pred_mask == 1] = [0, 255, 0]
-
-        blended = cv2.addWeighted(image, 0.6, overlay, 0.4, 0)
-        axes[plot_idx].imshow(blended)
-        axes[plot_idx].set_title('Overlay Result')
-        axes[plot_idx].axis('off')
+        # --- Plot 4: Overlay (Optional, assuming cols=4) ---
+        if plot_idx < cols:
+            axes[plot_idx].imshow(image)
+            axes[plot_idx].imshow(pred_mask, alpha=0.5, cmap='jet')
+            axes[plot_idx].set_title('Overlay')
+            axes[plot_idx].axis('off')
 
         plt.tight_layout()
+        
         if save_path:
-            plt.savefig(save_path, dpi=150)
-            print(f"Saved result to {save_path}")
+            plt.savefig(save_path)
+            print(f"Saved visualization to {save_path}")
+            
         plt.show()
+        
+        # Return metrics if you need to log them
+        # return dice_score, iou_mse_score
 
 def get_bbox_from_mask_file(mask_path):
     mask = cv2.imread(mask_path, 0)
@@ -162,3 +251,5 @@ def get_bbox_from_mask_file(mask_path):
     rmin, rmax = np.where(rows)[0][[0, -1]]
     cmin, cmax = np.where(cols)[0][[0, -1]]
     return [cmin, rmin, cmax, rmax] # x1, y1, x2, y2
+
+
