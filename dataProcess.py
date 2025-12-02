@@ -246,153 +246,127 @@ def down_lung_xrays_dataset() :
 
 
 
+def prepare_pancreas_npy_dataset(output_dir="Pancreas_Slices_Processed" , dataset_path=None):
+    # --- 1. Locate Dataset ---
+    # Based on your log, the path ends in 'versions/1'
+    if dataset_path is None:
+      try:
+          dataset_path = kagglehub.dataset_download("tahsin/pancreasct-dataset")
+          print(f"Dataset downloaded to: {dataset_path}")
+      except:
+          print("Could not download automatically. Please set 'dataset_path' manually.")
+          return
+    else:
+      print(f"Using provided dataset_path: {dataset_path}")
+   
 
+    # Adjust paths for the structure seen in your logs: root/images/ and root/labels/
+    images_source_dir = os.path.join(dataset_path, "images")
+    labels_source_dir = os.path.join(dataset_path, "labels")
 
-
-    import os
-import json
-import random
-import numpy as np
-import nibabel as nib  # For loading NIfTI (3D CT files)
-import cv2
-import kagglehub
-from tqdm import tqdm
-
-def prepare_pancreas_ct_dataset(output_dir="Pancreas_Slices_Processed"):
-    # Download Dataset (or set path if you have it locally) ---
-    print("Downloading Pancreas-CT dataset...")
-    try:
-        # This dataset usually contains 'data' and 'TCIA_pancreas_labels' folders
-        dataset_path = kagglehub.dataset_download("tahsin/pancreasct-dataset")
-        print("Path to dataset files:", dataset_path)
-    except Exception as e:
-        print(f"Error downloading: {e}. Please ensure you have the dataset locally.")
-        return
-
-    # Define paths 
+    # Output directories
     processed_imgs_dir = os.path.join(output_dir, "images")
     processed_masks_dir = os.path.join(output_dir, "masks")
     os.makedirs(processed_imgs_dir, exist_ok=True)
     os.makedirs(processed_masks_dir, exist_ok=True)
 
-    #  CT Windowing Function
+    # --- 2. Helper: CT Windowing ---
     def apply_windowing(image, level=40, width=400):
         """
-        Converts raw CT Hounsfield Units (HU) to 0-255 range.
-        Standard Soft Tissue Window: Level=40, Width=400.
+        Applies Soft Tissue Window (L:40, W:400) to raw CT data.
         """
+        # Check if image is already normalized (approx 0-1) or raw (approx -1000 to 2000)
+        if np.max(image) <= 1.0:
+            return (image * 255).astype(np.uint8)
+            
         lower = level - (width / 2)
         upper = level + (width / 2)
         image = np.clip(image, lower, upper)
-        image = (image - lower) / (upper - lower)  # Normalize 0 to 1
+        image = (image - lower) / (upper - lower)
         return (image * 255).astype(np.uint8)
 
-    # Find and Match 3D Files 
-    print("Scanning for 3D volumes (NIfTI)...")
+    # --- 3. Match Files ---
+    print("Scanning for .npy volumes...")
     
-    image_volumes = {}
-    label_volumes = {}
+    # Get all .npy files in images folder
+    all_files = [f for f in os.listdir(images_source_dir) if f.endswith('.npy')]
+    # Filter to ensure matching label exists
+    matched_ids = [f for f in all_files if os.path.exists(os.path.join(labels_source_dir, f))]
+    
+    print(f"Found {len(matched_ids)} matched subjects (e.g., {matched_ids[0] if matched_ids else 'None'}).")
 
-    for root, dirs, files in os.walk(dataset_path):
-        for file in files:
-            if file.endswith(".nii") or file.endswith(".nii.gz"):
-                full_path = os.path.join(root, file)
-                # Extract ID (assuming format like 'PANCREAS_0001' or 'label0001')
-                # We strip non-digits to find the ID: '0001'
-                file_id = ''.join(filter(str.isdigit, file))
-                
-                if "label" in file.lower() or "mask" in file.lower():
-                    label_volumes[file_id] = full_path
-                else:
-                    image_volumes[file_id] = full_path
+    # --- 4. Process Volumes ---
+    sample_registry = [] 
 
-    # Find common IDs
-    common_ids = sorted(list(set(image_volumes.keys()) & set(label_volumes.keys())))
-    print(f"Found {len(common_ids)} matched 3D subjects.")
-
-    #  Process Volumes: Slice 3D -> 2D 
-    sample_registry = [] # Stores (subject_id, slice_filename)
-
-    print("Slicing 3D volumes into 2D images...")
-    for subj_id in tqdm(common_ids):
-        # Load 3D volumes
-        img_nii = nib.load(image_volumes[subj_id])
-        lbl_nii = nib.load(label_volumes[subj_id])
-
-        # Get data as numpy arrays
-        img_data = nib.as_closest_canonical(img_nii).get_fdata()
-        lbl_data = nib.as_closest_canonical(lbl_nii).get_fdata()
-
-        # Iterate through Axial slices 
-        num_slices = img_data.shape[2]
+    print("Slicing 3D .npy volumes into 2D images...")
+    
+    for filename in tqdm(matched_ids):
+        # Load 3D arrays
+        # Shape is usually (Height, Width, Depth) -> (512, 512, Slices)
+        img_vol = np.load(os.path.join(images_source_dir, filename))
+        lbl_vol = np.load(os.path.join(labels_source_dir, filename))
         
-        for i in range(num_slices):
-            slice_img = img_data[:, :, i]
-            slice_mask = lbl_data[:, :, i]
+        # Validate shapes match
+        if img_vol.shape != lbl_vol.shape:
+            print(f"Skipping {filename}: Shape mismatch {img_vol.shape} vs {lbl_vol.shape}")
+            continue
 
-            # FILTERING: Only save slices that contain the pancreas?
+        # Determine Slice Axis (usually the smallest dimension or the one that isn't 512)
+        # We assume the axis with the smallest size is the Depth (Z-axis)
+        slice_axis = np.argmin(img_vol.shape)
+        num_slices = img_vol.shape[slice_axis]
+        
+        # Move slice axis to the front for easier iteration: (Slices, H, W)
+        img_vol = np.moveaxis(img_vol, slice_axis, 0)
+        lbl_vol = np.moveaxis(lbl_vol, slice_axis, 0)
+
+        subject_id = filename.replace('.npy', '')
+
+        for i in range(num_slices):
+            slice_img = img_vol[i]
+            slice_mask = lbl_vol[i]
+
+            # Filter: Keep slices with pancreas + small random subset of empty slices
             has_pancreas = np.sum(slice_mask) > 0
             
-            if has_pancreas or random.random() < 0.1: 
-                # Resize to standard size (e.g., 512x512 -> 256x256) if needed for Lite model
-                # slice_img = cv2.resize(slice_img, (256, 256))
-                # slice_mask = cv2.resize(slice_mask, (256, 256), interpolation=cv2.INTER_NEAREST)
+            if has_pancreas or random.random() < 0.1:
+                # Resize to 256x256 for SAM-Med-Lite (Optional, but recommended for speed)
+                slice_img = cv2.resize(slice_img, (256, 256))
+                slice_mask = cv2.resize(slice_mask, (256, 256), interpolation=cv2.INTER_NEAREST)
 
-                # Windowing (Crucial for CT)
+                # Normalize/Window
                 slice_img_uint8 = apply_windowing(slice_img)
-                
-                # Masks are usually 0 and 1. Convert to 0 and 255.
                 slice_mask_uint8 = (slice_mask > 0).astype(np.uint8) * 255
 
-                # Save files
-                # Filename format: SubjectID_SliceIndex.png
-                fname = f"{subj_id}_{i:04d}.png"
-                
+                # Save
+                fname = f"{subject_id}_{i:04d}.png"
                 cv2.imwrite(os.path.join(processed_imgs_dir, fname), slice_img_uint8)
                 cv2.imwrite(os.path.join(processed_masks_dir, fname), slice_mask_uint8)
 
-                sample_registry.append({
-                    "subject": subj_id,
-                    "filename": fname
-                })
+                sample_registry.append({"subject": subject_id, "filename": fname})
 
-    # Train/Test
-    #   split by Subject ID, not by slice, to avoid data leakage.
+    # --- 5. Split & Save JSONs ---
     random.seed(42)
-    random.shuffle(common_ids)
+    unique_subjects = list(set([x['subject'] for x in sample_registry]))
+    random.shuffle(unique_subjects)
     
-    split_idx = int(len(common_ids) * 0.8)
-    train_subjects = set(common_ids[:split_idx])
-    test_subjects = set(common_ids[split_idx:])
+    split_idx = int(len(unique_subjects) * 0.8)
+    train_subs = set(unique_subjects[:split_idx])
+    
+    train_map, test_map = {}, {}
 
-    train_map = {}
-    test_map = {}
-
-    print("Generating JSON mappings...")
     for item in sample_registry:
-        s_id = item["subject"]
-        fname = item["filename"]
+        path_img = os.path.join(processed_imgs_dir, item["filename"])
+        path_mask = os.path.join(processed_masks_dir, item["filename"])
         
-        img_path = os.path.join(processed_imgs_dir, fname)
-        mask_path = os.path.join(processed_masks_dir, fname)
-
-        if s_id in train_subjects:
-            # Format: Image -> [List of Masks] (SAM style usually accepts list)
-            train_map[img_path] = [mask_path]
+        if item["subject"] in train_subs:
+            train_map[path_img] = [path_mask]
         else:
-            # Format: Mask -> Image (Label2Image for evaluation)
-            test_map[mask_path] = img_path
+            test_map[path_mask] = path_img
 
-    # Save JSONs 
     with open('pancreas_image2label_train.json', 'w') as f:
         json.dump(train_map, f, indent=4)
-
     with open('pancreas_label2image_test.json', 'w') as f:
         json.dump(test_map, f, indent=4)
 
-    print("-" * 30)
-    print(f"Processing Complete.")
-    print(f"Total 2D slices generated: {len(sample_registry)}")
-    print(f"Training slices: {len(train_map)} (from {len(train_subjects)} subjects)")
-    print(f"Testing slices: {len(test_map)} (from {len(test_subjects)} subjects)")
-    print(f"Data saved to: {output_dir}")
+    print(f"Done! Created {len(sample_registry)} slices from {len(unique_subjects)} patients.")
