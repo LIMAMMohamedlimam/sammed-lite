@@ -1,4 +1,4 @@
------------------------------ testing on the    dataset-----------------------------------------------------
+----------------------------- testing on the  lugs_ct  dataset-----------------------------------------------------
 Evaluating:  14%|█▍        | 2/14 [00:00<00:03,  3.47it/s]DEBUG: Mask Logits | Min: -10.8486 | Max: 8.7937
 DEBUG: Mask Logits | Min: -11.1603 | Max: 7.9613
 Evaluating:  29%|██▊       | 4/14 [00:00<00:02,  4.91it/s]DEBUG: Mask Logits | Min: -10.6573 | Max: 8.7936
@@ -23,21 +23,6 @@ Empty Ground Truths (All Black): 0
 === Test Results ===
 Dice Coefficient: 0.9303
 IoU: 0.8717
-
---------------------------------------------------------------------------------------------------------------
-result of a sample training on kits23 dataset 
-
-Evaluating: 100%|██████████| 352/352 [01:13<00:00,  4.79it/s]
---- DEBUG REPORT ---
-Total Samples: 1408
-Empty Predictions (All Black): 1279
-Empty Ground Truths (All Black): 837
---------------------
-
-=== Test Results ===
-Dice Coefficient: 0.6224
-IoU: 0.6149
-
 
 ------------------------------------------------------------------------------------------------------------
 result of evaluation on lungs_xrays dataset

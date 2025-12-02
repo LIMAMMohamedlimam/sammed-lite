@@ -32,10 +32,10 @@ class SAMMed2DLite(nn.Module):
             images: [B, 3, H, W]
             boxes:  [B, K, 4] where K is the number of masks per image
         """
-        # 1. Encode Images
+        # Encode Images
         image_embeddings = self.sam.image_encoder(images)
 
-        # 2. Handle Dimensions
+        # Handle Dimensions
         B, C, H_e, W_e = image_embeddings.shape
         K = boxes.shape[1]
         
@@ -45,14 +45,14 @@ class SAMMed2DLite(nn.Module):
         # Repeat Image Embeddings to match the number of boxes
         image_embeddings_expanded = image_embeddings.unsqueeze(1).expand(-1, K, -1, -1, -1).reshape(B * K, C, H_e, W_e)
 
-        # 3. Encode Prompts
+        # Encode Prompts
         sparse_embeddings, dense_embeddings = self.sam.prompt_encoder(
             points=None,
             boxes=boxes_flat, 
             masks=None,
         )
         
-        # 4. Decode Masks
+        # Decode Masks
         if dense_embeddings.shape[-2:] != (H_e, W_e):
             dense_embeddings = F.interpolate(
                 dense_embeddings,
@@ -80,7 +80,7 @@ class SAMMed2DLite(nn.Module):
         
         # print(f"DEBUG: Mask Logits | Min: {low_res_masks.min().detach().item():.4f} | Max: {low_res_masks.max().detach().item():.4f}")
 
-        # 5. Upscale Masks
+        # Upscale Masks
         masks = F.interpolate(
             low_res_masks,
             size=(images.shape[2], images.shape[3]),
@@ -88,7 +88,7 @@ class SAMMed2DLite(nn.Module):
             align_corners=False
         )
         
-        # 6. Reshape back to [B, K, 1, H, W] if you want to compute loss per image
+        # Reshape back to [B, K, 1, H, W] if you want to compute loss per image
         masks = masks.view(B, K, 1, images.shape[2], images.shape[3])
         iou_predictions = iou_predictions.view(B, K, 1)
         
