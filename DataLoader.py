@@ -165,7 +165,7 @@ class DatasetLoader(Dataset):
             current_labels = [current_labels]
             
         if len(current_labels) > 0:
-            mask_paths = random.choices(current_labels, k=self.mask_num)
+            mask_paths = random.choices(current_labels, k=min(self.mask_num , len(current_labels)))
         else:
             mask_paths = []
 
