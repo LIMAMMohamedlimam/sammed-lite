@@ -40,3 +40,16 @@ IoU: 0.6149
 
 
 ------------------------------------------------------------------------------------------------------------
+result of evaluation on lungs_xrays dataset
+
+Evaluating: 100%|██████████| 36/36 [01:01<00:00,  1.71s/it]
+--- DEBUG REPORT ---
+Total Samples: 141
+Empty Predictions (All Black): 0
+Empty Ground Truths (All Black): 0
+--------------------
+
+=== Test Results ===
+Dice Coefficient: 0.8766
+IoU: 0.7821
+

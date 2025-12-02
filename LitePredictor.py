@@ -123,8 +123,14 @@ class LitePredictor:
             axes[plot_idx].axis('off')
             plot_idx += 1
 
-        dice_score = dice_loss(pred_mask , gt_mask)
-        iou_mse_score = iou_mse_loss(pred_mask , gt_mask,iou_score)
+        try:
+            pred_mask_tensor = torch.tensor(pred_mask).unsqueeze(0).unsqueeze(0).float()
+            gt_mask_tensor = torch.tensor(gt_mask).unsqueeze(0).unsqueeze(0).float()
+            dice_score = dice_loss(pred_mask_tensor , gt_mask_tensor)
+            iou_mse_score = iou_mse_loss(pred_mask_tensor ,gt_mask_tensor,iou_score)
+        except:
+            dice_score = 0.0
+            iou_mse_score = 0.0
 
         # 3. Predicted Mask
         axes[plot_idx].imshow(pred_mask, cmap='gray')

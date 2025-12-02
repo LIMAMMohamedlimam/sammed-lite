@@ -169,7 +169,7 @@ class DatasetLoader(Dataset):
         else:
             mask_paths = []
 
-        print(f"DEBUG : mask_paths_len: {len(mask_paths) }mask_paths: {mask_paths}")
+        print(f"DEBUG : mask_paths_len: {len(mask_paths) } mask_paths: {mask_paths}")
         
         masks_list = []
 
